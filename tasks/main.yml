@@ -1,0 +1,59 @@
+---
+
+- name: Before install - Increase Max number of File Descriptors
+  blockinfile:
+    path: /etc/sysctl.conf
+    create: yes
+    block: |
+      net.core.somaxconn = 1024
+      net.core.netdev_max_backlog = 5000
+      net.core.rmem_max = 16777216
+      net.core.wmem_max = 16777216
+      net.ipv4.tcp_wmem = 4096 12582912 16777216
+      net.ipv4.tcp_rmem = 4096 12582912 16777216
+      net.ipv4.tcp_max_syn_backlog = 8096
+      net.ipv4.tcp_slow_start_after_idle = 0
+      net.ipv4.tcp_tw_reuse = 1
+      net.ipv4.ip_local_port_range = 10240 65535
+
+- name: apply /etc/sysctl.conf
+  shell: systemctl -p /etc/sysctl.conf
+
+- name: Before install - Optimize Network Kernel Parameters
+  blockinfile:
+    path: /etc/security/limits.conf
+    create: yes
+    block: |
+      root soft nofile 65536
+      root hard nofile 65536
+      * soft nofile 65536
+      * hard nofile 65536
+
+- name: Attempting reboot
+  shell: reboot
+  async: 1200
+  poll: 0
+
+- name: Waiting for resurection
+  wait_for_connection:
+    delay: 60
+    timeout: 300
+
+- name: Update repositories cache and install "curl" package
+  apt:
+    name: curl
+    update_cache: yes
+
+- name: Install fluentd
+  shell: curl -L https://toolbelt.treasuredata.com/sh/install-debian-stretch-td-agent3.sh | sh
+
+- name: fluentd configuration
+  template:
+    src: "td-agent.conf.j2"
+    dest: "/etc/td-agent/td-agent.conf"
+
+- name: Make sure a service td-agent
+  systemd:
+    name: td-agent
+    state: started
+    enabled: True
