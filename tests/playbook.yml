@@ -1,0 +1,5 @@
+---
+- hosts: defined_host
+  become: yes
+  roles:
+    - fluentd
